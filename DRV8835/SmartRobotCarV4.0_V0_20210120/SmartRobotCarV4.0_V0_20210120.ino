@@ -11,7 +11,7 @@
 void setup()
 {
   // put your setup code here, to run once:
-  Application_FunctionSet.P();
+  Application_FunctionSet.ApplicationFunctionSet_Bootup();
   wdt_enable(WDTO_2S);
 }
 
