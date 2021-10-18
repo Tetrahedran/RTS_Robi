@@ -1,0 +1,1 @@
+When you upload code to the camera module, please select "AI Thinker ESP32-CAM" as the board.
