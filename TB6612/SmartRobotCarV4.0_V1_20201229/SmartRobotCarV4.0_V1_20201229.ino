@@ -1,42 +1,80 @@
-/*
- * @Author: ELEGOO
- * @Date: 2019-10-22 11:59:09
- * @LastEditTime: 2020-12-18 14:14:35
- * @LastEditors: Changhua
- * @Description: Smart Robot Car V4.0
- * @FilePath: 
- */
 #include <avr/wdt.h>
-#include "ApplicationFunctionSet_xxx0.h"
+#include <arduino.h>
+#include <arduino-timer.h>
+#include <TimerThree.h>
 
-void setup()
-{
-  // put your setup code here, to run once:
-  Application_FunctionSet.ApplicationFunctionSet_Init();
-  wdt_enable(WDTO_2S);
+enum RobiStates{
+    Idle,
+    Alerted,
+    Hunting
+};
+
+int pirPin = 2;
+int pirStat = 0;
+
+RobiStates currentState;
+int timerCounter = 0;
+
+
+void setup(){
+    init_Robi();
+    Timer1.init(1000000);
+    Timer1.attachInterrupt(timerISR);
+    pinMode(LED_BUILTIN, OUTPUT);
+    noInterrupts();
+    TCCR0A = 0;
+    TCCE0B = 0;
+    TCNT0 = 0;
+
+    OCR0A = 255;
+    TCCR0B |= (1 << WGM02)
+    TCCR0B |= (1 << CS02) | (1 << CS00)
+    TIMSK0 |= (1 << OCIE0A);
+    interrupts();
+    
 }
 
-void loop()
-{
-  //put your main code here, to run repeatedly :
-  wdt_reset();
-  Application_FunctionSet.ApplicationFunctionSet_SensorDataUpdate();
-  Application_FunctionSet.ApplicationFunctionSet_KeyCommand();
-  Application_FunctionSet.ApplicationFunctionSet_RGB();
-  Application_FunctionSet.ApplicationFunctionSet_Follow();
-  Application_FunctionSet.ApplicationFunctionSet_Obstacle();
-  Application_FunctionSet.ApplicationFunctionSet_Tracking();
-  Application_FunctionSet.ApplicationFunctionSet_Rocker();
-  Application_FunctionSet.ApplicationFunctionSet_Standby();
-  Application_FunctionSet.ApplicationFunctionSet_IRrecv();
-  Application_FunctionSet.ApplicationFunctionSet_SerialPortDataAnalysis();
+void loop(){
+    switch (currentState)
+    {
+    case Idle:
+        /* code */
+        digitalWrite(LED_BUILTIN, LOW);
+        if (pirStat == HIGH){
+            currentState = Alerted;
+        }
+        break;
+    case Alerted:
+        /* code */
+        digitalWrite(LED_BUILTIN, HIGH);
+        if (pirStat == LOW){
+            currentState = Idle;
+        }
+        break;
+    case Hunting:
+        /* code */
+        break;
+    default:
+        break;
+    }
+}
 
-  Application_FunctionSet.CMD_ServoControl_xxx0();
-  Application_FunctionSet.CMD_MotorControl_xxx0();
-  Application_FunctionSet.CMD_CarControlTimeLimit_xxx0();
-  Application_FunctionSet.CMD_CarControlNoTimeLimit_xxx0();
-  Application_FunctionSet.CMD_MotorControlSpeed_xxx0();
-  Application_FunctionSet.CMD_LightingControlTimeLimit_xxx0();
-  Application_FunctionSet.CMD_LightingControlNoTimeLimit_xxx0();
-  Application_FunctionSet.CMD_ClearAllFunctions_xxx0();
+void init_Robi(){
+    currentState = Idle;
+    pinMode(pirPin, INPUT);
+    Serial.begin(9600);
+    attachInterrupt(digitalPinToInterrupt(pirPin), pirISR, CHANGE);
+}
+
+void pirISR(){
+    pirStat = digitalRead(pirPin);
+}
+
+void timerISR(){
+    timerCounter = timerCounter + 1;
+}
+
+ISR(TIMER0_COMPA_vect){
+    
+    timerCounter = timerCounter + 1;
 }
