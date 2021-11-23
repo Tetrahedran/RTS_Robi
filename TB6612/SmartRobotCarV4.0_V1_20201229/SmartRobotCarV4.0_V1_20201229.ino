@@ -29,14 +29,13 @@ voidFunction callbackStateFunction;
 
 
 void setup(){
-    initRobi();
-    
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
     Timer3.initialize(1000000);
     Timer3.attachInterrupt(timerISR);
     FastLED.addLeds<NEOPIXEL, PIN_RBGLED>(leds, NUM_LEDS);
     FastLED.setBrightness(200);
+    initRobi();
 }
 
 void loop(){
