@@ -2,7 +2,8 @@
 #include <arduino.h>
 #include <arduino-timer.h>
 #include <TimerThree.h>
-#include <FastLED.h>	
+#include <FastLED.h>
+#include <TimerFour.h>	
 
 enum RobiStates{
     Idle,
