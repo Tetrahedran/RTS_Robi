@@ -1,3 +1,5 @@
+#include <TimerFive.h>
+
 #include <avr/wdt.h>
 #include <arduino.h>
 #include <arduino-timer.h>
