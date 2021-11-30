@@ -32,3 +32,6 @@
 *.app
 TB6612/SmartRobotCarV4.0_V1_20201229/.vscode/c_cpp_properties.json
 TB6612/SmartRobotCarV4.0_V1_20201229/.vscode/arduino.json
+
+.vscode/arduino.json
+.vscode/c_cpp_properties.json
