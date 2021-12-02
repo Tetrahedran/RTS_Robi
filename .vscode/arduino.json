@@ -1,7 +1,0 @@
-{
-    "board": "arduino:avr:mega",
-    "programmer": "arduino:avrisp",
-    "sketch": "TB6612\\SmartRobotCarV4.0_V1_20201229\\SmartRobotCarV4.0_V1_20201229.ino",
-    "port": "COM5",
-    "configuration": "cpu=atmega2560"
-}
