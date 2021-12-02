@@ -120,7 +120,7 @@ void ApplicationFunctionSet::ApplicationFunctionSet_Init(void)
   // {
   //   /*Clear serial port buffer...*/
   // }
-  Application_SmartRobotCarxxx0.Functional_Mode = Standby_mode;
+  Application_SmartRobotCarxxx0.Functional_Mode = ObstacleAvoidance_mode;
 }
 
 /*ITR20001 Check if the car leaves the ground*/

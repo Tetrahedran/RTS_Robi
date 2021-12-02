@@ -1,8 +1,9 @@
-#include <TimerFive.h>
 
 #include <avr/wdt.h>
+#include "ApplicationFunctionSet_xxx0.h"
+
+#include <TimerFive.h>
 #include <arduino.h>
-#include <arduino-timer.h>
 #include <TimerThree.h>
 #include <FastLED.h>
 #include <TimerFour.h>	
@@ -22,8 +23,9 @@ const int NUM_LEDS = 1;
 RobiStates currentState;
 int timerCounter = 0;
 int timeInAlerted = 0;
-int timerThreshold;
+int timerThreshold = 5;
 
+bool enabled = true;
 
 CRGB leds[NUM_LEDS]; 
 
@@ -34,20 +36,30 @@ voidFunction callbackStateFunction;
 void setup(){
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
-    Timer3.initialize(1000000);
-    Timer3.attachInterrupt(timerISR);
+    Application_FunctionSet.ApplicationFunctionSet_Init();
+    Timer5.initialize(1000000);
+    Timer5.attachInterrupt(timerISR);
     FastLED.addLeds<NEOPIXEL, PIN_RBGLED>(leds, NUM_LEDS);
     FastLED.setBrightness(200);
     initRobi();
 }
 
 void loop(){
+    if(enabled == false){
+        leds[0] = CRGB::Red;
+        FastLED.show();
+        Application_FunctionSet.ApplicationFunctionSet_Obstacle();
+    }else{
+        leds[0] = CRGB::Yellow;
+        FastLED.show();
 
+    }
+   //Application_FunctionSet.ApplicationFunctionSet_Obstacle();
     
 }
 
 void initRobi(){
-    setRobiState(Init);
+    //setRobiState(Init);
     pinMode(pirPin, INPUT);
     Serial.begin(9600);
     
@@ -73,6 +85,7 @@ void setRobiState(RobiStates newState){
                 timerThreshold = 300;
                 callbackStateFunction = []() -> void{
                     //move around random
+                    Application_FunctionSet.ApplicationFunctionSet_Obstacle();
                 };
                 break;
             case Alerted:
@@ -116,7 +129,8 @@ void timerISR(){
     if (timerCounter > timerThreshold){
         timerCounter = 0;
         //digitalWrite(LED_BUILTIN, HIGH);
-        callbackStateFunction();
+        //callbackStateFunction();
+        enabled = false;
     }
 }
 
