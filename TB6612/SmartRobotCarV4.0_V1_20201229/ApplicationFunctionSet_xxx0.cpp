@@ -636,6 +636,10 @@ void ApplicationFunctionSet::ApplicationFunctionSet_Tracking(void)
   }
 }
 
+void ApplicationFunctionSet::ApplicationFunctionSet_StopRobi(void){
+  ApplicationFunctionSet_SmartRobotCarMotionControl(stop_it, 0);
+}
+
 /*
   Obstacle Avoidance Mode
 */
