@@ -1,18 +1,23 @@
 #include <avr/wdt.h>
 #include "ApplicationFunctionSet_xxx0.h"
 #include <SoftTimers.h>
-//#include <TimerOne.h>
-#include <TimerFive.h>
 #include <arduino.h>
-#include <TimerThree.h>
+
 #include <FastLED.h>
-#include <TimerFour.h>	
+
 
 enum RobiStates{
     Idle,
     Alerted,
     Hunting,
     Init
+};
+
+enum DrivingStates{
+    Random,
+    Forward,
+    Turning,
+    DoNothing
 };
  
 
@@ -30,6 +35,7 @@ SoftTimer driveTimer;
 SoftTimer turnTimer; // maybe not needed -> depends on states propably
 
 RobiStates currentState;
+DrivingStates currentDrivingState;
 int timerCounter = 0;
 int timeInAlerted = 0;
 int timerThreshold = 5;
@@ -50,6 +56,7 @@ CRGB leds[NUM_LEDS];
 
 typedef void (*voidFunction) (void); 
 voidFunction callbackStateFunction;
+voidFunction callbackDriveStateFunction;
 
 
 void setup(){
@@ -60,10 +67,6 @@ void setup(){
     stateTimer.setTimeOutTime(timerThreshold);
     stateTimer.reset();
 
-    //Timer1.initialize(1000000);
-    //Timer1.attachInterrupt(timerISR);
-    //Timer5.initialize(100000);
-    //Timer5.attachInterrupt(timerDriveISR);
     FastLED.addLeds<NEOPIXEL, PIN_RBGLED>(leds, NUM_LEDS);
     FastLED.setBrightness(200);
     initRobi();
@@ -78,7 +81,14 @@ void loop(){
       enabledDrive = false;
       Serial.println("Driver timed out");
     }
-    if (turnTimer.hasTimedOut()){
+
+    if (enabledDrive == true){
+        callbackDriveStateFunction();
+    }else{
+      Application_FunctionSet.ApplicationFunctionSet_StopRobi();   
+    }
+
+    /*if (turnTimer.hasTimedOut()){
       enabledTurn = false;
       Serial.println("Turn timed out");
     }
@@ -93,7 +103,7 @@ void loop(){
     }
 
     // wie bereits gesagt @Joshua: Zusammensoiel von beiden Funktionen muss noch geklärt werden, damit sie nicht "gleichzeitig" ausgeführt werden
-    /*if(enabledDrive == true){
+    if(enabledDrive == true){
         
         leds[0] = CRGB::Red;
         FastLED.show();
@@ -125,6 +135,7 @@ void setRobiState(RobiStates newState){
                 stateTimer.reset();
                 callbackStateFunction = []() -> void {
                     attachInterrupt(digitalPinToInterrupt(pirPin), pirISR, CHANGE);
+                    setDrivingState(DoNothing);
                     setRobiState(Idle);
                 };
                 break;
@@ -136,32 +147,9 @@ void setRobiState(RobiStates newState){
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
 
-                // define turnAngle and get accordingly timerTurnTreshold
-                turnAngle = 90; // future: will be defined by sensor
-                timerTurnTreshold = getTurnTimerTreshold();
-
-                // MH: define meters (global variable) to drive forward
-                // MH: define speed (global variable) to drive with 
-                // MH:call function to calculate timerDriveTreshold (similar to getTurnTimerTreshold())
-
                 callbackStateFunction = []() -> void{
                     //move around random
-                    //Timer5.restart();
-                    turnTimer.setTimeOutTime(timerTurnTreshold);
-                    turnTimer.reset();
-                    enabledTurn = true;
-                    driveTimer.setTimeOutTime(timerDriveTreshold);
-                    driveTimer.reset();
-                    enabledDrive = true;
-                    stateTimer.setTimeOutTime(timerThreshold);
-                    stateTimer.reset();
-                    
-                    
-                    /*while (enabled == true){
-                       Application_FunctionSet.ApplicationFunctionSet_Obstacle(); 
-                       leds[0] = CRGB::Yellow;
-                       FastLED.show();
-                    }*/
+                    setDrivingState(Random);
                     
                 };
                 break;
@@ -170,6 +158,7 @@ void setRobiState(RobiStates newState){
                 timeInAlerted = 0;
                 callbackStateFunction = []() -> void{
                     // move around faster
+                    setDrivingState(Random);
                     timeInAlerted = timeInAlerted + timerThreshold;
                     if (timeInAlerted > alertedTimeThreshold){
                         setRobiState(Idle);
@@ -180,7 +169,7 @@ void setRobiState(RobiStates newState){
             case Hunting:
                 // catch & follow the sound
                 callbackStateFunction = []() -> void{
-                    
+                    //set variables, direction of sound, setDrivingState(Turning), setDrivingState(Forward)
                 };
                 timerThreshold = 1;
                 break;
@@ -188,6 +177,58 @@ void setRobiState(RobiStates newState){
                 break;
             }
         currentState = newState;
+    }
+}
+
+void setDrivingState(DrivingStates newState){
+    if (currentDrivingState != newState){
+        switch (newState)
+            {
+            case Random:
+                timerDriveTreshold = 5000;
+                driveTimer.setTimeOutTime(timerDriveTreshold);
+                driveTimer.reset();
+                enabledDrive = true;
+                callbackStateFunction = []() -> void {
+                    Application_FunctionSet.ApplicationFunctionSet_Obstacle();
+                };
+                break;
+            case Forward:
+                // MH: define meters (global variable) to drive forward
+                // MH: define speed (global variable) to drive with 
+                // MH:call function to calculate timerDriveTreshold (similar to getTurnTimerTreshold())
+                timerDriveTreshold = 5000; //more like calc it
+                driveTimer.setTimeOutTime(timerDriveTreshold);
+                driveTimer.reset();
+                enabledDrive = true;
+                callbackStateFunction = []() -> void {
+                    Application_FunctionSet.ApplicationFunctionSet_DriveRobi(speed);
+                };
+                break;
+      
+            case Turning:
+                // define turnAngle and get accordingly timerTurnTreshold
+                turnAngle = 90; // future: will be defined by sensor
+                timerDriveTreshold = getTurnTimerTreshold();
+                driveTimer.setTimeOutTime(timerDriveTreshold);
+                driveTimer.reset();
+                enabledDrive = true;
+                callbackStateFunction = []() -> void{
+                   Application_FunctionSet.ApplicationFunctionSet_TurnRobi(TURN_LEFT, speed); 
+                };
+                
+                break;
+            case DoNothing:
+                // 
+                callbackStateFunction = []() -> void{
+                    
+                };
+                
+                break;
+            default:
+                break;
+            }
+        currentDrivingState = newState;
     }
 }
 
@@ -217,23 +258,3 @@ int getTurnTimerTreshold(){
     return treshold;
   }
 }
-/*
-void timerISR(){
-    timerCounter = timerCounter + 1;
-    if (timerCounter > timerThreshold){
-        timerCounter = 0;
-        digitalWrite(LED_BUILTIN, HIGH);
-        callbackStateFunction();
-        //enabled = true;
-    }
-}
-
-void timerDriveISR(){
-    timerDriveCounter = timerDriveCounter + 1;
-    //enabled = true;
-    if (timerDriveCounter > timerDriveTreshold){
-        timerDriveCounter = 0;
-        enabledDrive = false;
-    }
-}
-*/
