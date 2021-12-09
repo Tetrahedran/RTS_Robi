@@ -1,0 +1,39 @@
+Changes for 2.0.0:
+
+* New feature: Support for ESP8266.
+* New feature: API change following issue #5.
+* New feature: Using win32Arduino v2.4.0
+* New feature: Using RapidAssist v0.9.1
+* Fixed issue #5: error: invalid conversion from 'long unsigned int (*)()' to 'SoftTimer::CounterFunctionPointer {aka unsigned int (*)()}' [-fpermissive]
+* Fixed issue #6: Build on GitHub Actions
+* Fixed issue #7: Running unit tests on 64 bit Linux
+
+
+Changes for 1.3.0:
+
+* New feature: Build option `SOFTTIMERS_BUILD_EXAMPLES` to enable/disable building SoftTimers examples.
+* New feature: Changed file/folder structure to be compatible with Arduino Library Manager.
+* New feature: Using RapidAssist 0.5.0 and win32Arduino 2.3.1.
+
+
+Changes for 1.2.0:
+
+* Source code now depends on win32Arduino third party library available at http://github.com/end2endzone/win32Arduino
+* First github release.
+* Code originally release at http://www.end2endzone.com/softtimers-a-collection-of-software-timers-to-easily-compute-elapsed-time-since-an-event-occured/
+
+
+Changes for 1.1.0:
+
+* Fixed a bug where uninitialized timeout time would return incorrect results.
+* Added support for using an external counting function. This also allows the same class (SoftTimer)
+  to support both milliseconds and microseconds.
+* Implemented progress and looping support. See getProgress(), getLoopCount() and getLoopProgress()
+* Implemented support for remaining time. See getRemainingTime()
+* Created new unit tests using win32Arduino library available at:
+  http://www.end2endzone.com/win32arduino-a-win32-library-that-implements-most-arduino-functions/
+* Added many new examples to show possible use of the library.
+
+
+Changes for 1.0.0:
+* Initial release.

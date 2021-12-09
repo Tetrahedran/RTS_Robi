@@ -65,6 +65,8 @@ enum SmartRobotCarMotionControl
   stop_it        //(9)
 };               //direction方向:（1）、（2）、 （3）、（4）、（5）、（6）
 
+
+
 /*Mode Control List*/
 enum SmartRobotCarFunctionalModel
 {
@@ -635,9 +637,102 @@ void ApplicationFunctionSet::ApplicationFunctionSet_Tracking(void)
     MotorRL_time = 0;
   }
 }
-
+/*
+  Stop Robi Motion
+*/
 void ApplicationFunctionSet::ApplicationFunctionSet_StopRobi(void){
   ApplicationFunctionSet_SmartRobotCarMotionControl(stop_it, 0);
+}
+
+/*
+  Turn Robi with parametrizable speed
+  Direction: 0 = left, 1 = right
+*/
+void ApplicationFunctionSet::ApplicationFunctionSet_TurnRobi(int direction, uint8_t speed){
+
+  if (direction == 0){
+    ApplicationFunctionSet_SmartRobotCarMotionControl(Left, speed);
+  }
+  if (direction == 1){
+    ApplicationFunctionSet_SmartRobotCarMotionControl(Right, speed);
+  }
+}
+
+/*
+  Drive Robi in Obstacle Avoidance Mode with parametrizable speed
+*/
+void ApplicationFunctionSet::ApplicationFunctionSet_DriveRobi(uint8_t speed)
+{
+  static boolean first_is = true;
+  if (Application_SmartRobotCarxxx0.Functional_Mode == ObstacleAvoidance_mode)
+  {
+    uint8_t switc_ctrl = 0;
+    uint16_t get_Distance;
+    if (Car_LeaveTheGround == false)
+    {
+      ApplicationFunctionSet_SmartRobotCarMotionControl(stop_it, 0);
+      return;
+    }
+    if (first_is == true) //Enter the mode for the first time, and modulate the steering gear to 90 degrees
+    {
+      AppServo.DeviceDriverSet_Servo_control(90 /*Position_angle*/);
+      first_is = false;
+    }
+
+    AppULTRASONIC.DeviceDriverSet_ULTRASONIC_Get(&get_Distance /*out*/);
+    if (function_xxx(get_Distance, 0, 20))
+    {
+      ApplicationFunctionSet_SmartRobotCarMotionControl(stop_it, 0);
+
+      for (uint8_t i = 1; i < 6; i += 2) //1、3、5 Omnidirectional detection of obstacle avoidance status
+      {
+        AppServo.DeviceDriverSet_Servo_control(30 * i /*Position_angle*/);
+        delay_xxx(1);
+        AppULTRASONIC.DeviceDriverSet_ULTRASONIC_Get(&get_Distance /*out*/);
+
+        if (function_xxx(get_Distance, 0, 20))
+        {
+          ApplicationFunctionSet_SmartRobotCarMotionControl(stop_it, 0);
+          if (5 == i)
+          {
+            ApplicationFunctionSet_SmartRobotCarMotionControl(Backward, speed);
+            delay_xxx(500);
+            ApplicationFunctionSet_SmartRobotCarMotionControl(Right, speed);
+            delay_xxx(50);
+            first_is = true;
+            break;
+          }
+        }
+        else
+        {
+          switc_ctrl = 0;
+          switch (i)
+          {
+          case 1:
+            ApplicationFunctionSet_SmartRobotCarMotionControl(Right, speed);
+            break;
+          case 3:
+            ApplicationFunctionSet_SmartRobotCarMotionControl(Forward, speed);
+            break;
+          case 5:
+            ApplicationFunctionSet_SmartRobotCarMotionControl(Left, speed);
+            break;
+          }
+          delay_xxx(50);
+          first_is = true;
+          break;
+        }
+      }
+    }
+    else //if (function_xxx(get_Distance, 20, 50))
+    {
+      ApplicationFunctionSet_SmartRobotCarMotionControl(Forward, 150);
+    }
+  }
+  else
+  {
+    first_is = true;
+  }
 }
 
 /*

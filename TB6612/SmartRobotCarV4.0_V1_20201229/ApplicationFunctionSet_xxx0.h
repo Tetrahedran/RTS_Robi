@@ -11,8 +11,19 @@
 
 #include <arduino.h>
 
+ 
+
 class ApplicationFunctionSet
 {
+
+//Robi Turn Motion
+/*public:
+  enum RobiMotionControl
+{
+  TurnLeft,          //(1)
+  TurnRight,         //(2)
+};*/
+
 public:
   void ApplicationFunctionSet_Init(void);
   void ApplicationFunctionSet_Bootup(void);
@@ -29,6 +40,8 @@ public:
   void ApplicationFunctionSet_SerialPortDataAnalysis(void);
   void ApplicationFunctionSet_IRrecv(void);
   void ApplicationFunctionSet_StopRobi(void);
+  void ApplicationFunctionSet_DriveRobi(uint8_t speed);
+  void ApplicationFunctionSet_TurnRobi(int direction, uint8_t speed);
 
 public: /*CMD*/
   void CMD_UltrasoundModuleStatus_xxx0(uint8_t is_get);
@@ -54,6 +67,7 @@ public: /*CMD*/
   void CMD_ClearAllFunctions_xxx0(void);
   void CMD_LEDNumberDisplayControl_xxx0(uint8_t is_LEDNumber);
   void CMD_TrajectoryControl_xxx0(void);
+
 
 private:
   /*Sensor Raw Value*/
