@@ -23,7 +23,7 @@ enum DrivingStates{
 // SoftTimers: 1000 = 1sec
 
 const int pirPin = 2;
-const int alertedTimeThreshold = 120;
+const int alertedTimeThreshold = 15000; //15 sec
 const int PIN_RBGLED = 4;
 const int NUM_LEDS = 1;
 
@@ -43,6 +43,8 @@ int timerThreshold = 5;
 int timerDriveCounter = 0;
 int timerDriveThreshold = 5000;
 int timerTurnThreshold = 2000;
+
+int testTimeInIdle = 0;
 
 //initilize car speed for initial mode
 uint8_t speed = 100;
@@ -74,7 +76,7 @@ void setup(){
 }
 
 void loop(){
-  Serial.println(timerDriveThreshold);
+  //Serial.println(timerDriveThreshold);
     if (stateTimer.hasTimedOut()){
       digitalWrite(LED_BUILTIN, HIGH);
       callbackStateFunction();
@@ -82,8 +84,15 @@ void loop(){
       //Serial.println(callbackStateFunction == nullptr);
     }
     if (driveTimer.hasTimedOut()){
+      if (currentState == Idle){
         leds[0] = CRGB::Green;
-                FastLED.show();
+        FastLED.show();
+      }
+      if (currentState == Alerted){
+        leds[0] = CRGB::Orange;
+        FastLED.show();
+      }
+        
       enabledDrive = false;
       int driverTimeOutTime = stateTimer.getTimeOutTime() + 1000;
       driveTimer.setTimeOutTime(driverTimeOutTime);
@@ -101,38 +110,11 @@ void loop(){
       Application_FunctionSet.ApplicationFunctionSet_StopRobi();   
     }
     
-
-    /*if (turnTimer.hasTimedOut()){
-      enabledTurn = false;
-      Serial.println("Turn timed out");
-    }
-
-    if (enabledTurn == true){
-      leds[0] = CRGB::Red;
-      FastLED.show();
-      Application_FunctionSet.ApplicationFunctionSet_TurnRobi(TURN_LEFT, speed);
-    }else{
-      Serial.println("Else STOP Turn");
-      Application_FunctionSet.ApplicationFunctionSet_StopRobi();        
-    }
-
-    // wie bereits gesagt @Joshua: Zusammensoiel von beiden Funktionen muss noch geklärt werden, damit sie nicht "gleichzeitig" ausgeführt werden
-    if(enabledDrive == true){
-        
-        leds[0] = CRGB::Red;
-        FastLED.show();
-        Application_FunctionSet.ApplicationFunctionSet_DriveRobi(speed);
-      }else{
-        //leds[0] = CRGB::Yellow;
-        //FastLED.show();
-        Serial.println("Else STOP");
-        Application_FunctionSet.ApplicationFunctionSet_StopRobi();
-    }*/
 }
 
 void initRobi(){
-    //setRobiState(Init);
-    setDrivingState(Forward);
+    setRobiState(Init);
+    setDrivingState(DoNothing);
     //currentDrivingState = DoNothing;
     pinMode(pirPin, INPUT);
     Serial.begin(9600);
@@ -151,7 +133,7 @@ void setRobiState(RobiStates newState){
                 stateTimer.reset();
                 callbackStateFunction = []() -> void {
                     attachInterrupt(digitalPinToInterrupt(pirPin), pirISR, CHANGE);
-                    //setDrivingState(DoNothing);
+                    
                     setRobiState(Idle);
                 };
                 break;
@@ -159,7 +141,7 @@ void setRobiState(RobiStates newState){
                 digitalWrite(LED_BUILTIN, HIGH);
                 leds[0] = CRGB::Green;
                 FastLED.show();
-                timerThreshold = 10000; //alle 30sec bewegen
+                timerThreshold = 10000; //alle 10sec bewegen
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
 
@@ -167,11 +149,18 @@ void setRobiState(RobiStates newState){
                     //move around random
                     Serial.println("Exec Random");
                     setDrivingState(Random);
-                    
+                    testTimeInIdle = testTimeInIdle + 1;
+                    if (testTimeInIdle>2){
+                        setRobiState(Alerted);
+                    }
                 };
                 break;
             case Alerted:
-                timerThreshold = 60;
+                leds[0] = CRGB::Orange;
+                FastLED.show();
+                timerThreshold = 5000; //alle 5 sec bewegen
+                stateTimer.setTimeOutTime(timerThreshold);
+                stateTimer.reset();
                 timeInAlerted = 0;
                 callbackStateFunction = []() -> void{
                     // move around faster
@@ -185,6 +174,8 @@ void setRobiState(RobiStates newState){
                 break;
             case Hunting:
                 // catch & follow the sound
+                leds[0] = CRGB::Red;
+                FastLED.show();
                 callbackStateFunction = []() -> void{
                     //set variables, direction of sound, setDrivingState(Turning), setDrivingState(Forward)
                 };
@@ -205,7 +196,7 @@ void setDrivingState(DrivingStates newState){
                 leds[0] = CRGB::White;
                     FastLED.show();
                 Serial.println("Setting Random state");
-                timerDriveThreshold = 5000; //5sec fahren
+                timerDriveThreshold = 4000; //4sec fahren
                 driveTimer.setTimeOutTime(timerDriveThreshold);
                 driveTimer.reset();
                 
