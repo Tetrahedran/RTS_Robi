@@ -20,6 +20,7 @@ enum DrivingStates{
     DoNothing
 };
  
+// SoftTimers: 1000 = 1sec
 
 const int pirPin = 2;
 const int alertedTimeThreshold = 120;
@@ -40,8 +41,8 @@ int timerCounter = 0;
 int timeInAlerted = 0;
 int timerThreshold = 5;
 int timerDriveCounter = 0;
-int timerDriveTreshold = 5000;
-int timerTurnTreshold = 2000;
+int timerDriveThreshold = 5000;
+int timerTurnThreshold = 2000;
 
 //initilize car speed for initial mode
 uint8_t speed = 100;
@@ -64,8 +65,8 @@ void setup(){
     digitalWrite(LED_BUILTIN, LOW);
     Application_FunctionSet.ApplicationFunctionSet_Init();
 
-    stateTimer.setTimeOutTime(timerThreshold);
-    stateTimer.reset();
+    //stateTimer.setTimeOutTime(timerThreshold);
+    //stateTimer.reset();
 
     FastLED.addLeds<NEOPIXEL, PIN_RBGLED>(leds, NUM_LEDS);
     FastLED.setBrightness(200);
@@ -73,20 +74,33 @@ void setup(){
 }
 
 void loop(){
+  Serial.println(timerDriveThreshold);
     if (stateTimer.hasTimedOut()){
       digitalWrite(LED_BUILTIN, HIGH);
       callbackStateFunction();
+      stateTimer.reset();
+      //Serial.println(callbackStateFunction == nullptr);
     }
     if (driveTimer.hasTimedOut()){
+        leds[0] = CRGB::Green;
+                FastLED.show();
       enabledDrive = false;
-      Serial.println("Driver timed out");
+      int driverTimeOutTime = stateTimer.getTimeOutTime() + 1000;
+      driveTimer.setTimeOutTime(driverTimeOutTime);
+      driveTimer.reset();
+      stateTimer.reset();
+      //Serial.println("Driver timed out");
     }
-
+    
+    //Serial.println(driveTimer.getElapsedTime());
+    
     if (enabledDrive == true){
         callbackDriveStateFunction();
     }else{
+        setDrivingState(DoNothing);
       Application_FunctionSet.ApplicationFunctionSet_StopRobi();   
     }
+    
 
     /*if (turnTimer.hasTimedOut()){
       enabledTurn = false;
@@ -117,7 +131,9 @@ void loop(){
 }
 
 void initRobi(){
-    setRobiState(Init);
+    //setRobiState(Init);
+    setDrivingState(Forward);
+    //currentDrivingState = DoNothing;
     pinMode(pirPin, INPUT);
     Serial.begin(9600);
     
@@ -130,12 +146,12 @@ void setRobiState(RobiStates newState){
             case Init:
                 leds[0] = CRGB::Blue;
                 FastLED.show();
-                timerThreshold = 1500; //120
+                timerThreshold = 10000; //10sec
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
                 callbackStateFunction = []() -> void {
                     attachInterrupt(digitalPinToInterrupt(pirPin), pirISR, CHANGE);
-                    setDrivingState(DoNothing);
+                    //setDrivingState(DoNothing);
                     setRobiState(Idle);
                 };
                 break;
@@ -143,12 +159,13 @@ void setRobiState(RobiStates newState){
                 digitalWrite(LED_BUILTIN, HIGH);
                 leds[0] = CRGB::Green;
                 FastLED.show();
-                timerThreshold = 3000; //300
+                timerThreshold = 10000; //alle 30sec bewegen
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
 
                 callbackStateFunction = []() -> void{
                     //move around random
+                    Serial.println("Exec Random");
                     setDrivingState(Random);
                     
                 };
@@ -181,27 +198,35 @@ void setRobiState(RobiStates newState){
 }
 
 void setDrivingState(DrivingStates newState){
-    if (currentDrivingState != newState){
+       
         switch (newState)
             {
             case Random:
-                timerDriveTreshold = 5000;
-                driveTimer.setTimeOutTime(timerDriveTreshold);
+                leds[0] = CRGB::White;
+                    FastLED.show();
+                Serial.println("Setting Random state");
+                timerDriveThreshold = 5000; //5sec fahren
+                driveTimer.setTimeOutTime(timerDriveThreshold);
                 driveTimer.reset();
-                enabledDrive = true;
-                callbackStateFunction = []() -> void {
+                
+                callbackDriveStateFunction = []() -> void {
                     Application_FunctionSet.ApplicationFunctionSet_Obstacle();
                 };
+                enabledDrive = true;
                 break;
             case Forward:
                 // MH: define meters (global variable) to drive forward
                 // MH: define speed (global variable) to drive with 
                 // MH:call function to calculate timerDriveTreshold (similar to getTurnTimerTreshold())
-                timerDriveTreshold = 5000; //more like calc it
-                driveTimer.setTimeOutTime(timerDriveTreshold);
+                //timerDriveTreshold = 4000; //more like calc it
+                int forwardDistance = 53;
+                timerDriveThreshold = getForwardTimeThreshold(forwardDistance);
+                Serial.println("Forward Mode");
+                Serial.println(timerDriveThreshold);
+                driveTimer.setTimeOutTime(timerDriveThreshold);
                 driveTimer.reset();
                 enabledDrive = true;
-                callbackStateFunction = []() -> void {
+                callbackDriveStateFunction = []() -> void {
                     Application_FunctionSet.ApplicationFunctionSet_DriveRobi(speed);
                 };
                 break;
@@ -209,27 +234,31 @@ void setDrivingState(DrivingStates newState){
             case Turning:
                 // define turnAngle and get accordingly timerTurnTreshold
                 turnAngle = 90; // future: will be defined by sensor
-                timerDriveTreshold = getTurnTimerTreshold();
-                driveTimer.setTimeOutTime(timerDriveTreshold);
+                timerDriveThreshold = getTurnTimerThreshold();
+                driveTimer.setTimeOutTime(timerDriveThreshold);
                 driveTimer.reset();
                 enabledDrive = true;
-                callbackStateFunction = []() -> void{
+                callbackDriveStateFunction = []() -> void{
                    Application_FunctionSet.ApplicationFunctionSet_TurnRobi(TURN_LEFT, speed); 
                 };
                 
                 break;
             case DoNothing:
-                // 
-                callbackStateFunction = []() -> void{
-                    
-                };
+                //
+                enabledDrive = false;
+                //leds[0] = CRGB::Green;
+                //    FastLED.show();
+                Application_FunctionSet.ApplicationFunctionSet_StopRobi();
+                //callbackDriveStateFunction = []() -> void{
+                //    Application_FunctionSet.ApplicationFunctionSet_StopRobi();
+                //};
                 
                 break;
             default:
                 break;
             }
         currentDrivingState = newState;
-    }
+    
 }
 
 void pirISR(){
@@ -245,7 +274,7 @@ void pirISR(){
 // for now only calibrated for speed = 100 -> need to be defined also for other speeds used in our state machine
 // If we have only defined speeds w can also use states instead of speed ranges maybe
 // for left turn calibration works good, but not 100% exact for right turn --> maybe differentiation here also in the future
-int getTurnTimerTreshold(){
+int getTurnTimerThreshold(){
   int treshold = 0;
   if (speed > 75 && speed < 125){
     int offset = 100; // offset to get car into motion for speed 100 with turn of ~10 degree
@@ -257,4 +286,22 @@ int getTurnTimerTreshold(){
   else{
     return treshold;
   }
+}
+
+
+int getForwardTimeThreshold(int pathLength){
+    int threshold = 0;
+    if (speed > 75 && speed < 125){
+        if (pathLength<=20){
+            static int k = 50;
+            return threshold = pathLength * k;
+        }else{
+            float adjustPath = pathLength - 20;
+            float calibrate = adjustPath / 40;
+            float readjustPath = calibrate + 1;
+            return threshold = readjustPath * 1000;
+        }
+    }else{
+        return threshold;
+    }
 }
