@@ -45,15 +45,17 @@ int timerDriveThreshold = 5000;
 int timerTurnThreshold = 2000;
 
 int testTimeInIdle = 0;
+int testCounterHunting = 0;
 
 //initilize car speed for initial mode
 uint8_t speed = 100;
 // initialize meters to drive formard in cm --> not used in current version 
-int driveForwardDistance = 500; 
+int forwardDistance = 100; 
 int turnAngle = 90; // 90 degree
 
 volatile bool enabledDrive = false;
 volatile bool enabledTurn = false;
+volatile bool enabledHunting = false;
 
 CRGB leds[NUM_LEDS]; 
 
@@ -100,13 +102,26 @@ void loop(){
       stateTimer.reset();
       //Serial.println("Driver timed out");
     }
+
+    
     
     //Serial.println(driveTimer.getElapsedTime());
     
     if (enabledDrive == true){
         callbackDriveStateFunction();
     }else{
-        setDrivingState(DoNothing);
+        if (currentDrivingState == Turning){
+            setDrivingState(Forward);
+        }else if(currentDrivingState == Forward){
+            //Hunting ends, enemy caught
+            setRobiState(Idle);
+            setDrivingState(DoNothing);
+        }
+        
+        else{
+            setDrivingState(DoNothing);
+        }
+        
       Application_FunctionSet.ApplicationFunctionSet_StopRobi();   
     }
     
@@ -145,6 +160,8 @@ void setRobiState(RobiStates newState){
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
 
+                testTimeInIdle = 0;
+
                 callbackStateFunction = []() -> void{
                     //move around random
                     Serial.println("Exec Random");
@@ -162,6 +179,10 @@ void setRobiState(RobiStates newState){
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
                 timeInAlerted = 0;
+
+                //Test counter here
+                testCounterHunting = 0;
+
                 callbackStateFunction = []() -> void{
                     // move around faster
                     setDrivingState(Random);
@@ -169,6 +190,10 @@ void setRobiState(RobiStates newState){
                     if (timeInAlerted > alertedTimeThreshold){
                         setRobiState(Idle);
                     }
+                    if (testCounterHunting > 1){
+                        setRobiState(Hunting);
+                    }
+                    testCounterHunting = testCounterHunting + 1;
                 };
                 
                 break;
@@ -176,10 +201,18 @@ void setRobiState(RobiStates newState){
                 // catch & follow the sound
                 leds[0] = CRGB::Red;
                 FastLED.show();
+                //stateTimer.setTimeOutTime(1);
+                //stateTimer.reset();
+                //Get turn angle and distance from micro
+                //Set variables with setter methods (setTurnAngle, setForwardDistance)
+                setTurnAngle(90);
+                setForwardDistance(60);
+                setDrivingState(Turning);
+                //set variables, direction of sound, setDrivingState(Turning), setDrivingState(Forward)
                 callbackStateFunction = []() -> void{
-                    //set variables, direction of sound, setDrivingState(Turning), setDrivingState(Forward)
+                
                 };
-                timerThreshold = 1;
+                
                 break;
             default:
                 break;
@@ -209,9 +242,8 @@ void setDrivingState(DrivingStates newState){
                 // MH: define meters (global variable) to drive forward
                 // MH: define speed (global variable) to drive with 
                 // MH:call function to calculate timerDriveTreshold (similar to getTurnTimerTreshold())
-                //timerDriveTreshold = 4000; //more like calc it
-                int forwardDistance = 53;
-                timerDriveThreshold = getForwardTimeThreshold(forwardDistance);
+                //int forwardDistance = 53;
+                timerDriveThreshold = getForwardTimeThreshold(getForwardDistance());
                 Serial.println("Forward Mode");
                 Serial.println(timerDriveThreshold);
                 driveTimer.setTimeOutTime(timerDriveThreshold);
@@ -224,8 +256,8 @@ void setDrivingState(DrivingStates newState){
       
             case Turning:
                 // define turnAngle and get accordingly timerTurnTreshold
-                turnAngle = 90; // future: will be defined by sensor
-                timerDriveThreshold = getTurnTimerThreshold();
+                //turnAngle = 90; // future: will be defined by sensor
+                timerDriveThreshold = getTurnTimerThreshold(getTurnAngle());
                 driveTimer.setTimeOutTime(timerDriveThreshold);
                 driveTimer.reset();
                 enabledDrive = true;
@@ -265,34 +297,50 @@ void pirISR(){
 // for now only calibrated for speed = 100 -> need to be defined also for other speeds used in our state machine
 // If we have only defined speeds w can also use states instead of speed ranges maybe
 // for left turn calibration works good, but not 100% exact for right turn --> maybe differentiation here also in the future
-int getTurnTimerThreshold(){
-  int treshold = 0;
+int getTurnTimerThreshold(int turnAngle){
+  int threshold = 0;
   if (speed > 75 && speed < 125){
     int offset = 100; // offset to get car into motion for speed 100 with turn of ~10 degree
     static float k = 8;
-    static float treshold_float = float(turnAngle - 10) * k;
-    return treshold = offset + int(treshold_float);
+    static float threshold_float = float(turnAngle - 10) * k;
+    return threshold = offset + int(threshold_float);
   }
   // weitere Speed bereiche definieren --> k & offset ...
   else{
-    return treshold;
+    return threshold;
   }
 }
 
 
-int getForwardTimeThreshold(int pathLength){
+int getForwardTimeThreshold(int distance){
     int threshold = 0;
     if (speed > 75 && speed < 125){
-        if (pathLength<=20){
+        if (distance<=20){
             static int k = 50;
-            return threshold = pathLength * k;
+            return threshold = distance * k;
         }else{
-            float adjustPath = pathLength - 20;
-            float calibrate = adjustPath / 40;
-            float readjustPath = calibrate + 1;
-            return threshold = readjustPath * 1000;
+            float adjustedDistance = distance - 20;
+            float calibrate = adjustedDistance / 40;
+            float readjustedDistance = calibrate + 1;
+            return threshold = readjustedDistance * 1000;
         }
     }else{
         return threshold;
     }
+}
+
+void setTurnAngle(int angle){
+    turnAngle = angle;
+}
+
+void setForwardDistance(int distance){
+    forwardDistance = distance;
+}
+
+int getTurnAngle(){
+    return turnAngle;
+}
+
+int getForwardDistance(){
+    return forwardDistance;
 }
