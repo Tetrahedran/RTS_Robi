@@ -96,7 +96,7 @@ void loop(){
       }
         
       enabledDrive = false;
-      int driverTimeOutTime = stateTimer.getTimeOutTime() + 1000;
+      int driverTimeOutTime = stateTimer.getTimeOutTime() + 1000; //to guarantee that drivertimer does not timeout earlier than state
       driveTimer.setTimeOutTime(driverTimeOutTime);
       driveTimer.reset();
       stateTimer.reset();
@@ -164,12 +164,16 @@ void setRobiState(RobiStates newState){
 
                 callbackStateFunction = []() -> void{
                     //move around random
-                    Serial.println("Exec Random");
-                    setDrivingState(Random);
-                    testTimeInIdle = testTimeInIdle + 1;
+                    
                     if (testTimeInIdle>2){
                         setRobiState(Alerted);
+                    }else{
+                        testTimeInIdle = testTimeInIdle + 1;
+                        Serial.println("Exec Random");
+                        setDrivingState(Random);
                     }
+                    
+                    
                 };
                 break;
             case Alerted:
@@ -311,7 +315,7 @@ int getTurnTimerThreshold(int turnAngle){
   }
 }
 
-
+// distance in cm
 int getForwardTimeThreshold(int distance){
     int threshold = 0;
     if (speed > 75 && speed < 125){
@@ -333,6 +337,7 @@ void setTurnAngle(int angle){
     turnAngle = angle;
 }
 
+//distance in cm
 void setForwardDistance(int distance){
     forwardDistance = distance;
 }
