@@ -2,7 +2,7 @@
 #include "ApplicationFunctionSet_xxx0.h"
 #include <SoftTimers.h>
 #include <arduino.h>
-
+#include <TimerFreeTone.h>
 #include <FastLED.h>
 
 
@@ -26,6 +26,7 @@ const int pirPin = 2;
 const int alertedTimeThreshold = 15000; //15 sec
 const int PIN_RBGLED = 4;
 const int NUM_LEDS = 1;
+const int buzzerPin = 53;
 
 // könnte man als enum machen, habe ich nur nicht direkt hinbekommen weil das in der Funktion DeviceDriverSet_xxx0.cpp verwendet wird
 const int TURN_LEFT = 0; 
@@ -33,7 +34,7 @@ const int TURN_RIGHT = 1;
 
 SoftTimer stateTimer;
 SoftTimer driveTimer;
-SoftTimer turnTimer; // maybe not needed -> depends on states propably
+//SoftTimer turnTimer; // maybe not needed -> depends on states propably
 
 RobiStates currentState;
 DrivingStates currentDrivingState;
@@ -46,6 +47,13 @@ int timerTurnThreshold = 2000;
 
 int testTimeInIdle = 0;
 int testCounterHunting = 0;
+
+//long buzzerFrequence = 1200;
+//long buzzerDuration = 100;
+int melody[] = { 150, 200, 250, 0, 150, 200, 250};
+int duration[] = { 500, 500, 500, 500, 500, 500, 500};
+int melodyFound[] = {250, 250, 250, 0, 250, 250, 250};
+int durationFound[] = { 500, 500, 500, 500, 500, 500, 500};
 
 //initilize car speed for initial mode
 uint8_t speed = 100;
@@ -75,15 +83,14 @@ void setup(){
     FastLED.addLeds<NEOPIXEL, PIN_RBGLED>(leds, NUM_LEDS);
     FastLED.setBrightness(200);
     initRobi();
+
 }
 
 void loop(){
-  //Serial.println(timerDriveThreshold);
     if (stateTimer.hasTimedOut()){
       digitalWrite(LED_BUILTIN, HIGH);
       callbackStateFunction();
       stateTimer.reset();
-      //Serial.println(callbackStateFunction == nullptr);
     }
     if (driveTimer.hasTimedOut()){
       if (currentState == Idle){
@@ -114,8 +121,12 @@ void loop(){
             setDrivingState(Forward);
         }else if(currentDrivingState == Forward){
             //Hunting ends, enemy caught
-            setRobiState(Idle);
             setDrivingState(DoNothing);
+            int arrSize = sizeof(melodyFound)/sizeof(melodyFound[0]);
+            for (int thisNote = 0; thisNote < arrSize; thisNote++) { // Loop through the notes in the array.
+                TimerFreeTone(buzzerPin, melodyFound[thisNote], durationFound[thisNote]); // Play thisNote for duration.
+            }
+            setRobiState(Idle);
         }
         
         else{
@@ -130,7 +141,6 @@ void loop(){
 void initRobi(){
     setRobiState(Init);
     setDrivingState(DoNothing);
-    //currentDrivingState = DoNothing;
     pinMode(pirPin, INPUT);
     Serial.begin(9600);
     
@@ -165,7 +175,7 @@ void setRobiState(RobiStates newState){
                 callbackStateFunction = []() -> void{
                     //move around random
                     
-                    if (testTimeInIdle>2){
+                    if (testTimeInIdle>1){ //2
                         setRobiState(Alerted);
                     }else{
                         testTimeInIdle = testTimeInIdle + 1;
@@ -194,7 +204,7 @@ void setRobiState(RobiStates newState){
                     if (timeInAlerted > alertedTimeThreshold){
                         setRobiState(Idle);
                     }
-                    if (testCounterHunting > 1){
+                    if (testCounterHunting > 0){ //1
                         setRobiState(Hunting);
                     }
                     testCounterHunting = testCounterHunting + 1;
@@ -205,6 +215,10 @@ void setRobiState(RobiStates newState){
                 // catch & follow the sound
                 leds[0] = CRGB::Red;
                 FastLED.show();
+                int arrSize = sizeof(melody)/sizeof(melody[0]);
+                for (int thisNote = 0; thisNote < arrSize; thisNote++) { // Loop through the notes in the array.
+                    TimerFreeTone(buzzerPin, melody[thisNote], duration[thisNote]); // Play thisNote for duration.
+                }
                 //stateTimer.setTimeOutTime(1);
                 //stateTimer.reset();
                 //Get turn angle and distance from micro
