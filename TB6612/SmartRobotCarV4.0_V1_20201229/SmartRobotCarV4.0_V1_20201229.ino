@@ -11,7 +11,7 @@ const int pins[] = {A8, A9, A10, A11};
 const int dir[] = {45, 45, 135, 135};
 const int leftMics[] = {A8, A11};
 //float calib[] = {1.0f,1.43f,1.0f,2.22f};
-float calib[] = {1,1,1,1};
+float calib[] = {1.2f,1,1,1.3f};
 const int pin_size = 4;
 const int threshold = 200;
 
@@ -106,8 +106,6 @@ void setup(){
 }
 
 void loop(){
-    Serial.print("Can drive: ");
-    Serial.println(enabledDrive);
     if (stateTimer.hasTimedOut()){
       digitalWrite(LED_BUILTIN, HIGH);
       enabledMicArray = false;
@@ -115,7 +113,6 @@ void loop(){
       stateTimer.reset();
     }
     if (driveTimer.hasTimedOut()){
-        Serial.println("Timeout");
         
       if (currentState == Idle){
         leds[0] = CRGB::Green;
@@ -131,7 +128,6 @@ void loop(){
       driveTimer.setTimeOutTime(driverTimeOutTime);
       driveTimer.reset();
       stateTimer.reset();
-      Serial.println("Set driver timer timeout based on statetimer");
       delay(100);
       enabledMicArray = true;
     }
@@ -478,7 +474,7 @@ void setDrivingState(DrivingStates newState){
                 callbackDriveStateFunction = []() -> void{
                     //enabledMicArray = false;
                     int direction = TURN_RIGHT;
-                    if(getTurnAngle<0){
+                    if(getTurnAngle()<0){
                         direction = TURN_LEFT;
                     }
                    Application_FunctionSet.ApplicationFunctionSet_TurnRobi(direction, speed); 
