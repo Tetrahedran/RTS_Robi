@@ -338,7 +338,7 @@ void setRobiState(RobiStates newState){
                 //enabledMicArray = true;
                 callbackStateFunction = []() -> void {
                     attachInterrupt(digitalPinToInterrupt(pirPin), pirISR, CHANGE);
-                    
+                    enabledMicArray = true;
                     setRobiState(Idle);
                 };
                 break;
@@ -349,7 +349,7 @@ void setRobiState(RobiStates newState){
                 timerThreshold = 10000; //alle 10sec bewegen
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
-                enabledMicArray = true;
+                
 
                 //testTimeInIdle = 0;
 
