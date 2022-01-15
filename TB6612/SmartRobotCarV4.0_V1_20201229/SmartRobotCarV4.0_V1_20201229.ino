@@ -128,7 +128,11 @@ void loop(){
       driveTimer.setTimeOutTime(driverTimeOutTime);
       driveTimer.reset();
       stateTimer.reset();
-      delay(100);
+      // delay(100);
+      //enabledMicArray = true;
+    }
+
+    if (enabledDrive == false && currentState != Init && stateTimer.getElapsedTime()>1000){
       enabledMicArray = true;
     }
     
@@ -345,7 +349,7 @@ void setRobiState(RobiStates newState){
                 timerThreshold = 10000; //alle 10sec bewegen
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
-                //enabledMicArray = true;
+                enabledMicArray = true;
 
                 //testTimeInIdle = 0;
 
@@ -474,6 +478,8 @@ void setDrivingState(DrivingStates newState){
                 callbackDriveStateFunction = []() -> void{
                     //enabledMicArray = false;
                     int direction = TURN_RIGHT;
+                    Serial.print("Angle direction: ");
+                    Serial.println(getTurnAngle());
                     if(getTurnAngle()<0){
                         direction = TURN_LEFT;
                     }
