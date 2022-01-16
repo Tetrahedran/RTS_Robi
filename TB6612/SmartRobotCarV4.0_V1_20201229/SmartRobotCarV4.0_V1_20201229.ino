@@ -6,7 +6,7 @@
 #include <FastLED.h>
 #include <stdlib.h>
 
-
+// For mic array ##############
 const int pins[] = {A8, A9, A10, A11};
 const int dir[] = {45, 45, 135, 135};
 const int leftMics[] = {A8, A11};
@@ -18,6 +18,7 @@ const int threshold = 200;
 bool nd = false;
 int cnt[pin_size][2];
 
+// State machine #############
 enum RobiStates{
     Idle,
     Alerted,
@@ -31,47 +32,35 @@ enum DrivingStates{
     Turning,
     DoNothing
 };
- 
-// SoftTimers: 1000 = 1sec
 
+RobiStates currentState;
+DrivingStates currentDrivingState;
+
+
+// Defining constants
 const int pirPin = 2;
 const int alertedTimeThreshold = 15000; //15 sec
 const int PIN_RBGLED = 4;
 const int NUM_LEDS = 1;
 const int buzzerPin = 53;
-
-// könnte man als enum machen, habe ich nur nicht direkt hinbekommen weil das in der Funktion DeviceDriverSet_xxx0.cpp verwendet wird
 const int TURN_LEFT = 0; 
 const int TURN_RIGHT = 1;
 
+// SoftTimers: 1000 = 1sec
 SoftTimer stateTimer;
 SoftTimer driveTimer;
-//SoftTimer turnTimer; // maybe not needed -> depends on states propably
 
-RobiStates currentState;
-DrivingStates currentDrivingState;
-int timerCounter = 0;
 int timeInAlerted = 0;
 int timerThreshold = 5;
-int timerDriveCounter = 0;
 int timerDriveThreshold = 5000;
-int timerTurnThreshold = 2000;
 
-int testTimeInIdle = 0;
-int testCounterHunting = 0;
-
-int micCounter = 1;
-
-//long buzzerFrequence = 1200;
-//long buzzerDuration = 100;
-int melody[] = { 150, 200, 250, 0, 150, 200, 250};
-int duration[] = { 500, 500, 500, 500, 500, 500, 500};
+// Melody and duration of tones if hunting object was found
 int melodyFound[] = {250, 250, 250, 0, 250, 250, 250};
 int durationFound[] = { 500, 500, 500, 500, 500, 500, 500};
 
 //initilize car speed for initial mode
 uint8_t speed = 100;
-// initialize meters to drive formard in cm --> not used in current version 
+// initialize meters to drive forward in cm 
 int forwardDistance = 40; 
 int turnAngle = 90; // 90 degree
 
@@ -82,6 +71,7 @@ volatile bool enabledMicArray = true;
 
 CRGB leds[NUM_LEDS]; 
 
+// Definition of callback functions for different states
 typedef void (*voidFunction) (void); 
 voidFunction callbackStateFunction;
 voidFunction callbackDriveStateFunction;
@@ -91,9 +81,6 @@ void setup(){
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
     Application_FunctionSet.ApplicationFunctionSet_Init();
-
-    //stateTimer.setTimeOutTime(timerThreshold);
-    //stateTimer.reset();
 
     FastLED.addLeds<NEOPIXEL, PIN_RBGLED>(leds, NUM_LEDS);
     FastLED.setBrightness(200);
@@ -110,10 +97,11 @@ void loop(){
       digitalWrite(LED_BUILTIN, HIGH);
       enabledMicArray = false;
       callbackStateFunction();
-      stateTimer.reset();
+      stateTimer.reset(); // to start the timer again
     }
-    if (driveTimer.hasTimedOut()){
-        
+
+    if (driveTimer.hasTimedOut()){ 
+      // Set the LEDs depending on the current state
       if (currentState == Idle){
         leds[0] = CRGB::Green;
         FastLED.show();
@@ -123,15 +111,17 @@ void loop(){
         FastLED.show();
       }
         
-      enabledDrive = false;
+      enabledDrive = false; // To stop the roboter movement
       int driverTimeOutTime = stateTimer.getTimeOutTime() + 1000; //to guarantee that drivertimer does not timeout earlier than state
+      //So we want to stop moving and starting the state timer again. The driver timer is set correctly when its needed (when the
+      // roboter starts moving) in setDrivingStates
       driveTimer.setTimeOutTime(driverTimeOutTime);
       driveTimer.reset();
       stateTimer.reset();
-      // delay(100);
-      //enabledMicArray = true;
     }
 
+    // After each movement we want to wait 1sec until the mic array is activated again, because otherwise the
+    // mics get a signal from somewhere (possibly from the servos) and interprets it as a noise
     if (enabledDrive == false && currentState != Init && stateTimer.getElapsedTime()>1000){
       enabledMicArray = true;
     }
@@ -139,12 +129,13 @@ void loop(){
     if (enabledDrive == true){
         callbackDriveStateFunction();
     }else{
-        
+        //To ensure that roboter first turns and than drives forward
         if (currentDrivingState == Turning){
             setDrivingState(Forward);
         }else if(currentDrivingState == Forward){
             //Hunting ends, enemy caught
             setDrivingState(DoNothing);
+            //Make a sound
             int arrSize = sizeof(melodyFound)/sizeof(melodyFound[0]);
             for (int thisNote = 0; thisNote < arrSize; thisNote++) { // Loop through the notes in the array.
                 TimerFreeTone(buzzerPin, melodyFound[thisNote], durationFound[thisNote]); // Play thisNote for duration.
@@ -169,10 +160,10 @@ void initRobi(){
     setRobiState(Init);
     setDrivingState(DoNothing);
     pinMode(pirPin, INPUT);
-    Serial.begin(9600);
-    
+    Serial.begin(9600);   
 }
 
+//For noise detection by mic array ###############
 void micDetect(){
   int raw_values[pin_size];
   int values[pin_size];
@@ -301,10 +292,7 @@ int getMaxPin(int values[]){
 }
 
 void noiseDetected(float direction){
-    //micCounter = micCounter - 1;
     if(currentState != Init){
-        Serial.println("noise detected executed");
-        Serial.println(enabledDrive);
         killMovement();
         setForwardDistance(40);
         setTurnAngle((int) direction);
@@ -314,9 +302,7 @@ void noiseDetected(float direction){
         else if(currentState == Alerted){
             setRobiState(Hunting);
         }
-    }
-    
-    
+    }   
 }
 
 void killMovement(){
@@ -324,9 +310,9 @@ void killMovement(){
     setDrivingState(DoNothing);
 }
 
+//State machine #################
 void setRobiState(RobiStates newState){
     if (currentState != newState){
-        //micCounter = 1;
         switch (newState)
             {
             case Init:
@@ -335,7 +321,6 @@ void setRobiState(RobiStates newState){
                 timerThreshold = 15000; //15sec
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
-                //enabledMicArray = true;
                 callbackStateFunction = []() -> void {
                     attachInterrupt(digitalPinToInterrupt(pirPin), pirISR, CHANGE);
                     enabledMicArray = true;
@@ -346,45 +331,21 @@ void setRobiState(RobiStates newState){
                 digitalWrite(LED_BUILTIN, HIGH);
                 leds[0] = CRGB::Green;
                 FastLED.show();
-                timerThreshold = 10000; //alle 10sec bewegen
+                timerThreshold = 10000; //Move every 10 sec
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
-                
-
-                //testTimeInIdle = 0;
-
                 callbackStateFunction = []() -> void{
                     //move around random
-                    
                     setDrivingState(Random);
-                    
-                    /*if (testTimeInIdle>1){ //2
-                        setRobiState(Alerted);
-                    }else{
-                        testTimeInIdle = testTimeInIdle + 1;
-                        Serial.println("Exec Random");
-                        setDrivingState(Random);
-                    }*/
-                    
-                    
                 };
-                
                 break;
             case Alerted:
                 leds[0] = CRGB::Orange;
                 FastLED.show();
-                timerThreshold = 5000; //alle 5 sec bewegen
+                timerThreshold = 5000; //Move every 4 sec
                 stateTimer.setTimeOutTime(timerThreshold);
                 stateTimer.reset();
                 timeInAlerted = 0;
-                //enabledMicArray = true;
-                //int arrSize = sizeof(melody)/sizeof(melody[0]);
-                //for (int thisNote = 0; thisNote < arrSize; thisNote++) { // Loop through the notes in the array.
-                //    TimerFreeTone(buzzerPin, melody[thisNote], duration[thisNote]); // Play thisNote for duration.
-                //}
-                //Test counter here
-                //testCounterHunting = 0;
-
                 callbackStateFunction = []() -> void{
                     // move around faster
                     setDrivingState(Random);
@@ -392,10 +353,6 @@ void setRobiState(RobiStates newState){
                     if (timeInAlerted > alertedTimeThreshold){
                         setRobiState(Idle);
                     }
-                    /*if (testCounterHunting > 0){ //1
-                        setRobiState(Hunting);
-                    }
-                    testCounterHunting = testCounterHunting + 1;*/
                 };
                 
                 break;
@@ -403,22 +360,10 @@ void setRobiState(RobiStates newState){
                 // catch & follow the sound
                 leds[0] = CRGB::Red;
                 FastLED.show();
-
-                //enabledMicArray = true;
-                //int arrSize = sizeof(melody)/sizeof(melody[0]);
-                //for (int thisNote = 0; thisNote < arrSize; thisNote++) { // Loop through the notes in the array.
-                //    TimerFreeTone(buzzerPin, melody[thisNote], duration[thisNote]); // Play thisNote for duration.
-                //}
-                //stateTimer.setTimeOutTime(100000);
-                //stateTimer.reset();
-                //Get turn angle and distance from micro
-                //Set variables with setter methods (setTurnAngle, setForwardDistance)
-                //setTurnAngle(90);
-                //setForwardDistance(60);
                 setDrivingState(Turning);
-                //set variables, direction of sound, setDrivingState(Turning), setDrivingState(Forward)
                 callbackStateFunction = []() -> void{
-                
+                  //No need for defining a callback, because there are just 2 steps to do for hunting: turning, driving
+                  //And if there is a new signal afterwards, it will trigger the state machine again
                 };
                 
                 break;
@@ -429,8 +374,8 @@ void setRobiState(RobiStates newState){
     }
 }
 
+// Driving states, so that different movement actions are done separately
 void setDrivingState(DrivingStates newState){
-       
         switch (newState)
             {
             case Random:
@@ -442,32 +387,26 @@ void setDrivingState(DrivingStates newState){
                 driveTimer.reset();
                 enabledDrive = true;
                 callbackDriveStateFunction = []() -> void {
-                    //enabledMicArray = false;
+                    //Do Obstacle Avoidance
                     Application_FunctionSet.ApplicationFunctionSet_Obstacle();
                 };
                 
                 break;
             case Forward:
-                // MH: define meters (global variable) to drive forward
-                // MH: define speed (global variable) to drive with 
-                // MH:call function to calculate timerDriveTreshold (similar to getTurnTimerTreshold())
-                //int forwardDistance = 53;
+                //Calculate timer threshold depending on the forward distance
                 timerDriveThreshold = getForwardTimeThreshold(getForwardDistance());
                 Serial.println("Forward Mode");
-                Serial.println(timerDriveThreshold);
                 driveTimer.setTimeOutTime(timerDriveThreshold);
                 driveTimer.reset();
                 enabledDrive = true;
                 enabledMicArray = false;
                 callbackDriveStateFunction = []() -> void {
-                    //enabledMicArray = false;
                     Application_FunctionSet.ApplicationFunctionSet_DriveRobi(speed);
                 };
                 break;
       
             case Turning:
-                // define turnAngle and get accordingly timerTurnTreshold
-                //turnAngle = 90; // future: will be defined by sensor
+                //Calculate timer threshold depending on turn angle
                 timerDriveThreshold = getTurnTimerThreshold(getTurnAngle());
                 Serial.print("Angle Threshold: ");
                 Serial.println(timerDriveThreshold);
@@ -476,49 +415,39 @@ void setDrivingState(DrivingStates newState){
                 enabledDrive = true;
                 enabledMicArray = false;
                 callbackDriveStateFunction = []() -> void{
-                    //enabledMicArray = false;
                     int direction = TURN_RIGHT;
                     Serial.print("Angle direction: ");
                     Serial.println(getTurnAngle());
+                    //If negative angle, turn left
                     if(getTurnAngle()<0){
                         direction = TURN_LEFT;
                     }
                    Application_FunctionSet.ApplicationFunctionSet_TurnRobi(direction, speed); 
-                };
-                
+                };             
                 break;
             case DoNothing:
-                //
+                //Stop the engines
                 enabledDrive = false;            
-                //leds[0] = CRGB::Green;
-                //    FastLED.show();
                 Application_FunctionSet.ApplicationFunctionSet_StopRobi();
-                //enabledMicArray = true;
-                //callbackDriveStateFunction = []() -> void{
-                //    Application_FunctionSet.ApplicationFunctionSet_StopRobi();
-                //};
-                
                 break;
             default:
                 break;
             }
-        currentDrivingState = newState;
-    
+        currentDrivingState = newState;   
 }
 
+//Handling input from the PIR
 void pirISR(){
     int pirStat = digitalRead(pirPin);
     if ((currentState == Idle) && (pirStat == HIGH)){
         setRobiState(Alerted);
     }else if ((currentState == Alerted) && (pirStat == HIGH)){
         timeInAlerted = 0;
-    }
-    
+    }    
 }
 
-// for now only calibrated for speed = 100 -> need to be defined also for other speeds used in our state machine
-// If we have only defined speeds w can also use states instead of speed ranges maybe
-// for left turn calibration works good, but not 100% exact for right turn --> maybe differentiation here also in the future
+
+//Calculate timer threshold depending on the turn angle. This method is calibrated for speed=100
 int getTurnTimerThreshold(int turnAngle){
   int threshold = 0;
   if (speed > 75 && speed < 125){
@@ -527,13 +456,12 @@ int getTurnTimerThreshold(int turnAngle){
     static float threshold_float = float(turnAngle - 10) * k;
     return threshold = offset + int(threshold_float);
   }
-  // weitere Speed bereiche definieren --> k & offset ...
   else{
     return threshold;
   }
 }
 
-// distance in cm
+// Calculate time threshold depending on the distance in cm. This method is calibrated for speed=100
 int getForwardTimeThreshold(int distance){
     int threshold = 0;
     if (speed > 75 && speed < 125){
@@ -567,3 +495,5 @@ int getTurnAngle(){
 int getForwardDistance(){
     return forwardDistance;
 }
+
+
